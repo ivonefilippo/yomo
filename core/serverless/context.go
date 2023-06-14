@@ -1,6 +1,9 @@
 package serverless
 
-import "github.com/yomorun/yomo/core/frame"
+import (
+	"github.com/yomorun/yomo/core/frame"
+	"github.com/yomorun/yomo/serverless"
+)
 
 // Context sfn handler context
 type Context struct {
@@ -39,4 +42,12 @@ func (c *Context) Write(tag uint32, data []byte) error {
 	dataFrame.SetSourceID(metaFrame.SourceID())
 	dataFrame.SetCarriage(tag, data)
 	return c.writer.WriteFrame(dataFrame)
+}
+
+func (c *Context) HTTP() serverless.HTTP {
+	return nil
+}
+
+func (c *Context) SQL() serverless.SQL {
+	return nil
 }

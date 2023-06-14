@@ -9,6 +9,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/fatih/color v1.15.0
 	github.com/joho/godotenv v1.4.0
+	github.com/lib/pq v1.10.9
 	github.com/matoous/go-nanoid/v2 v2.0.0
 	github.com/quic-go/quic-go v0.34.0
 	github.com/reactivex/rxgo/v2 v2.5.0

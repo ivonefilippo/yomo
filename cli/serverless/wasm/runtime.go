@@ -44,6 +44,9 @@ func NewRuntime(runtimeType string) (Runtime, error) {
 	case "wasmedge":
 		return newWasmEdgeRuntime()
 	default:
-		return nil, fmt.Errorf("invalid runtime type: %s, wasmtime and wasmedge are supported in current version", runtimeType)
+		return nil, fmt.Errorf(
+			"invalid runtime type: %s, wasmtime and wasmedge are supported in current version",
+			runtimeType,
+		)
 	}
 }

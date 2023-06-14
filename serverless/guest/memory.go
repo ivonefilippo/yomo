@@ -32,3 +32,51 @@ func GetBytes(fn func(ptr uintptr, size uint32) (len uint32)) (result []byte) {
 	_ = fn(ptr, size)
 	return buf
 }
+
+//export yomo_alloc
+func alloc(size uint32) uintptr {
+	buf := make([]byte, size)
+	ptr := &buf[0]
+	return uintptr(unsafe.Pointer(ptr))
+}
+
+// stringToPtrSize converts a string to a pointer and its size.
+func stringToPtrSize(s string) (uintptr, uint32) {
+	if s == "" {
+		return 0, 0
+	}
+	buf := []byte(s)
+	ptr := &buf[0]
+	unsafePtr := uintptr(unsafe.Pointer(ptr))
+	return unsafePtr, uint32(len(buf))
+}
+
+func packPtrAndSize(ptr uint32, size uint32) uint64 {
+	return uint64(ptr)<<32 | uint64(size)
+}
+
+func unpackPtrAndSize(ptrAndSize uint64) (uint32, uint32) {
+	return uint32(ptrAndSize >> 32), uint32(ptrAndSize)
+}
+
+// readBufferFromMemory returns a buffer
+func readBufferFromMemory(bufferPosition *uint32, length uint32) []byte {
+	buf := make([]byte, length)
+	ptr := uintptr(unsafe.Pointer(bufferPosition))
+	for i := 0; i < int(length); i++ {
+		s := *(*int32)(unsafe.Pointer(ptr + uintptr(i)))
+		buf[i] = byte(s)
+	}
+	return buf
+}
+
+// copyBufferToMemory returns a single value (a kind of pair with position and size)
+func copyBufferToMemory(buffer []byte) uint64 {
+	bufferPtr := &buffer[0]
+	unsafePtr := uintptr(unsafe.Pointer(bufferPtr))
+
+	ptr := uint32(unsafePtr)
+	size := uint32(len(buffer))
+
+	return packPtrAndSize(ptr, size)
+}
