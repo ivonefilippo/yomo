@@ -19,5 +19,6 @@ type HTTP interface {
 }
 type SQL interface {
 	Open(driverName string, dataSourceName string) error
-	Query(query string) ([]map[string]any, error)
+	Query(query string, args ...any) ([]map[string]any, error)
+	QueryRow(query string, args ...any) (map[string]any, error)
 }

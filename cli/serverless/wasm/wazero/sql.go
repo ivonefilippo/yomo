@@ -28,10 +28,32 @@ func ExportSQLHostFuncs(builder wazero.HostModuleBuilder) {
 		NewFunctionBuilder().
 		WithGoModuleFunction(
 			api.GoModuleFunc(Query),
-			[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			[]api.ValueType{
+				api.ValueTypeI32, // queryPtr
+				api.ValueTypeI32, // querySize
+				api.ValueTypeI32, // argsPtr
+				api.ValueTypeI32, // argsSize
+				api.ValueTypeI32, // resultPtr
+				api.ValueTypeI32, // resultSize
+			},
 			[]api.ValueType{api.ValueTypeI32},
 		).
-		Export(wasmsql.WasmFuncSQLQuery)
+		Export(wasmsql.WasmFuncSQLQuery).
+		// query row
+		NewFunctionBuilder().
+		WithGoModuleFunction(
+			api.GoModuleFunc(QueryRow),
+			[]api.ValueType{
+				api.ValueTypeI32, // queryPtr
+				api.ValueTypeI32, // querySize
+				api.ValueTypeI32, // argsPtr
+				api.ValueTypeI32, // argsSize
+				api.ValueTypeI32, // resultPtr
+				api.ValueTypeI32, // resultSize
+			},
+			[]api.ValueType{api.ValueTypeI32},
+		).
+		Export(wasmsql.WasmFuncSQLQueryRow)
 }
 
 // func Open(driverName, dataSourceName string) (*DB, error) {
@@ -39,114 +61,101 @@ func Open(ctx context.Context, m api.Module, stack []uint64) {
 	// driver name
 	driverNamePtr := uint32(stack[0])
 	driverNameSize := uint32(stack[1])
-	buf, ok := m.Memory().Read(driverNamePtr, driverNameSize)
-	if !ok {
-		log.Printf(
-			"[SQLOpen] driver name: Memory.Read(%d, %d) out of range\n",
-			driverNamePtr,
-			driverNameSize,
-		)
+	driverName, err := readBuffer(ctx, m, driverNamePtr, driverNameSize)
+	if err != nil {
+		log.Printf("[SQL] Open: get driver name error: %s\n", err)
 		stack[0] = 1
 		return
 	}
-	driverName := make([]byte, driverNameSize)
-	copy(driverName, buf)
-	// log.Printf("[SQLOpen] driver name: %s\n", driverName)
 	// data source name
 	dataSourceNamePtr := uint32(stack[2])
 	dataSourceNameSize := uint32(stack[3])
-	buf, ok = m.Memory().Read(dataSourceNamePtr, dataSourceNameSize)
-	if !ok {
-		log.Printf(
-			"[SQLOpen] data soruce name: Memory.Read(%d, %d) out of range\n",
-			dataSourceNamePtr,
-			dataSourceNameSize,
-		)
+	dataSourceName, err := readBuffer(ctx, m, dataSourceNamePtr, dataSourceNameSize)
+	if err != nil {
+		log.Printf("[SQL] Open: get data soruce name error: %s\n", err)
 		stack[0] = 2
 		return
 	}
-	dataSourceName := make([]byte, dataSourceNameSize)
-	copy(dataSourceName, buf)
-	// log.Printf("[SQLOpen] data source name: %s\n", dataSourceName)
 	// open
 	db, err := sql.Open(string(driverName), string(dataSourceName))
 	if err != nil {
-		log.Printf("[SQLOpen] Open(%s, %s) error: %v\n", driverName, dataSourceName, err)
+		log.Printf("[SQL] Open: open %s error: %s\n", driverName, err)
 		stack[0] = 3
 		return
 	}
 	// ping
 	if err := db.Ping(); err != nil {
-		log.Printf("[SQLOpen] Ping() error: %v\n", err)
+		log.Printf("[SQL] Open: ping error: %s\n", err)
 		stack[0] = 4
 		return
 	}
-	log.Println("[SQLOpen] Ping() success")
+	log.Println("[SQL] ✅ Open database success")
 	// return db
 	DB = db
 	stack[0] = 0
-	// dbPtr := uintptr(unsafe.Pointer(db))
-	// stack[0] = uint64(dbPtr)
-	// // m.Memory().WriteUint32Le(uint32(stack[0]), uint32(dbPtr))
-	// log.Printf("[SQLOpen] DB[%T]: %v, stack[0]=%d, dbPtr=%d\n", db, db, stack[0], dbPtr)
 	return
 }
 
 func Query(ctx context.Context, m api.Module, stack []uint64) {
+	// query
 	queryPtr := uint32(stack[0])
 	querySize := uint32(stack[1])
-	buf, ok := m.Memory().Read(queryPtr, querySize)
-	if !ok {
-		log.Printf(
-			"[SQLQuery] query: Memory.Read(%d, %d) out of range\n",
-			queryPtr,
-			querySize,
-		)
+	query, err := readBuffer(ctx, m, queryPtr, querySize)
+	if err != nil {
+		log.Printf("[SQL] Query: get query error: %s\n", err)
 		stack[0] = 1
 		return
 	}
-	query := make([]byte, querySize)
-	copy(query, buf)
-	log.Printf("[SQLQuery] query: %s\n", query)
-	// query
-	rows, err := DB.QueryContext(ctx, string(query))
-	if err != nil {
-		log.Printf("[SQLQuery] Query(%s) error: %v\n", query, err)
-		stack[0] = 2
-		return
+	// args
+	var hasArgs bool
+	var args []any
+	argsPtr := uint32(stack[2])
+	argsSize := uint32(stack[3])
+	if argsPtr > 0 && argsSize > 0 {
+		argsBuf, err := readBuffer(ctx, m, argsPtr, argsSize)
+		if err != nil {
+			log.Printf("[SQL] Query: get args error: %s\n", err)
+			stack[0] = 2
+			return
+		}
+		if err := json.Unmarshal(argsBuf, &args); err != nil {
+			log.Printf("[SQL] Query: args unmarshal err: %s\n", err)
+			stack[0] = 3
+			return
+		}
+		hasArgs = len(args) > 0
 	}
-	defer rows.Close()
-	result, err := rows2maps(rows)
-	if err != nil {
-		log.Printf("[SQLQuery] rows2maps() error: %v\n", err)
-		stack[0] = 3
-		return
+	// exec query
+	var rows *sql.Rows
+	if hasArgs {
+		rows, err = DB.QueryContext(ctx, string(query), args...)
+	} else {
+		rows, err = DB.QueryContext(ctx, string(query))
 	}
-	log.Printf("[SQLQuery] result: %v\n", result)
-	resultBuf, err := json.Marshal(result)
 	if err != nil {
-		log.Printf("[SQLQuery] Marshal() error: %v\n", err)
+		log.Printf("[SQL] Query: exec(%s) error: %s\n", query, err)
 		stack[0] = 4
 		return
 	}
-
-	if len(resultBuf) == 0 {
-		log.Println("[SQLQuery] resultBuf is empty")
+	defer rows.Close()
+	// result
+	result, err := rows2maps(rows)
+	if err != nil {
+		log.Printf("[SQL] Query: rows2maps error: %s\n", err)
 		stack[0] = 5
 		return
 	}
-	log.Printf("[SQLQuery] resultBuf: %s\n", resultBuf)
+	resultBuf, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("[SQL] Query: marshal error: %s\n", err)
+		stack[0] = 6
+		return
+	}
 	// allocate buffer and write to memory
-	resultPtr := uint32(stack[2])
-	resultSize := uint32(stack[3])
-	log.Printf(
-		"[SQLQuery] resultPtr=%d, resultSize=%d, bufLen=%d\n",
-		resultPtr,
-		resultSize,
-		len(resultBuf),
-	)
+	resultPtr := uint32(stack[4])
+	resultSize := uint32(stack[5])
 	if err := allocateBuffer(ctx, m, resultPtr, resultSize, resultBuf); err != nil {
-		log.Printf("[SQLQuery] allocateBuffer() error: %v\n", err)
+		log.Printf("[SQL] Query: allocate buffer error: %s\n", err)
 		stack[0] = 9
 		return
 	}
@@ -170,7 +179,7 @@ func rows2maps(rows *sql.Rows) (result []map[string]any, err error) {
 	for rows.Next() {
 		err = rows.Scan(values...)
 		if nil != err {
-			log.Printf("[rows2map] Scan() error: %v\n", err)
+			log.Printf("[SQL] rows2map: scan error: %v\n", err)
 			return result, err
 		}
 		row := make(map[string]any)
@@ -180,4 +189,72 @@ func rows2maps(rows *sql.Rows) (result []map[string]any, err error) {
 		result = append(result, row)
 	}
 	return
+}
+
+func QueryRow(ctx context.Context, m api.Module, stack []uint64) {
+	// query
+	queryPtr := uint32(stack[0])
+	querySize := uint32(stack[1])
+	query, err := readBuffer(ctx, m, queryPtr, querySize)
+	if err != nil {
+		log.Printf("[SQL] QueryRow: get query error: %s\n", err)
+		stack[0] = 1
+		return
+	}
+	// args
+	var hasArgs bool
+	var args []any
+	argsPtr := uint32(stack[2])
+	argsSize := uint32(stack[3])
+	if argsPtr > 0 && argsSize > 0 {
+		argsBuf, err := readBuffer(ctx, m, argsPtr, argsSize)
+		if err != nil {
+			log.Printf("[SQL] QueryRow: get args error: %s\n", err)
+			stack[0] = 2
+			return
+		}
+		if err := json.Unmarshal(argsBuf, &args); err != nil {
+			log.Printf("[SQL] QueryRow: args unmarshal err: %s\n", err)
+			stack[0] = 3
+			return
+		}
+		hasArgs = len(args) > 0
+	}
+	// exec query
+	var rows *sql.Rows
+	if hasArgs {
+		rows, err = DB.QueryContext(ctx, string(query), args...)
+	} else {
+		rows, err = DB.QueryContext(ctx, string(query))
+	}
+	if err != nil {
+		log.Printf("[SQL] QueryRow: exec(%s) error: %s\n", query, err)
+		stack[0] = 4
+		return
+	}
+	// result
+	items, err := rows2maps(rows)
+	if err != nil {
+		log.Printf("[SQL] QueryRow: rows2maps error: %s\n", err)
+		stack[0] = 5
+		return
+	}
+	if len(items) > 0 {
+		result := items[0]
+		resultBuf, err := json.Marshal(result)
+		if err != nil {
+			log.Printf("[SQL] QueryRow: marshal error: %s\n", err)
+			stack[0] = 6
+			return
+		}
+		// allocate buffer and write to memory
+		resultPtr := uint32(stack[4])
+		resultSize := uint32(stack[5])
+		if err := allocateBuffer(ctx, m, resultPtr, resultSize, resultBuf); err != nil {
+			log.Printf("[SQL] Query: allocate buffer error: %s\n", err)
+			stack[0] = 9
+			return
+		}
+	}
+	stack[0] = 0
 }

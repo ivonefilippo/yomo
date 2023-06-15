@@ -2,7 +2,7 @@ package wazero
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 )
@@ -22,13 +22,23 @@ func allocateBuffer(
 	}
 	allocPtr := uint32(memResults[0])
 	if !m.Memory().WriteUint32Le(bufPtr, allocPtr) {
-		return errors.New("memory write `bufPtr` error")
+		return fmt.Errorf("memory write(%d) with %d out of range", bufPtr, allocPtr)
 	}
 	if !m.Memory().WriteUint32Le(bufSize, uint32(bufLen)) {
-		return errors.New("memory write `bufSize` error")
+		return fmt.Errorf("memory write(%d) with %d out of range", bufSize, bufLen)
 	}
 	if !m.Memory().Write(allocPtr, buf) {
-		return errors.New("memory write `buf` error")
+		return fmt.Errorf("memory write(%d, %d) out of range", allocPtr, bufLen)
 	}
 	return nil
+}
+
+func readBuffer(ctx context.Context, m api.Module, bufPtr uint32, bufSize uint32) ([]byte, error) {
+	buf, ok := m.Memory().Read(bufPtr, bufSize)
+	if !ok {
+		return nil, fmt.Errorf("memory read(%d, %d) out of range", bufPtr, bufSize)
+	}
+	result := make([]byte, bufSize)
+	copy(result, buf)
+	return result, nil
 }

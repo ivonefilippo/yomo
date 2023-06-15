@@ -51,6 +51,13 @@ func stringToPtrSize(s string) (uintptr, uint32) {
 	return unsafePtr, uint32(len(buf))
 }
 
+// bufferPtrSize returns the memory position and size of the buffer
+func bufferToPtrSize(buff []byte) (uintptr, uint32) {
+	ptr := &buff[0]
+	unsafePtr := uintptr(unsafe.Pointer(ptr))
+	return unsafePtr, uint32(len(buff))
+}
+
 func packPtrAndSize(ptr uint32, size uint32) uint64 {
 	return uint64(ptr)<<32 | uint64(size)
 }
