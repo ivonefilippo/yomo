@@ -25,6 +25,7 @@ type SQL interface {
 	Query(query string, args ...any) ([]map[string]any, error)
 	QueryRow(query string, args ...any) (map[string]any, error)
 	Exec(query string, args ...any) (*SQLResult, error)
+	Close() error
 }
 
 // SQLResult sql result

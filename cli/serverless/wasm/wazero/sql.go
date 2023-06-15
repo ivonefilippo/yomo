@@ -68,10 +68,18 @@ func ExportSQLHostFuncs(builder wazero.HostModuleBuilder) {
 			},
 			[]api.ValueType{api.ValueTypeI32},
 		).
-		Export(wasmsql.WasmFuncSQLExec)
+		Export(wasmsql.WasmFuncSQLExec).
+		// close
+		NewFunctionBuilder().
+		WithGoModuleFunction(
+			api.GoModuleFunc(Close),
+			[]api.ValueType{},
+			[]api.ValueType{api.ValueTypeI32},
+		).
+		Export(wasmsql.WasmFuncSQLClose)
 }
 
-// func Open(driverName, dataSourceName string) (*DB, error) {
+// Open opens a database specified by its database driver name and a driver-specific data source name
 func Open(ctx context.Context, m api.Module, stack []uint64) {
 	// driver name
 	driverNamePtr := uint32(stack[0])
@@ -110,6 +118,7 @@ func Open(ctx context.Context, m api.Module, stack []uint64) {
 	stack[0] = 0
 }
 
+// Query executes a query that returns rows, typically a SELECT
 func Query(ctx context.Context, m api.Module, stack []uint64) {
 	// query
 	queryPtr := uint32(stack[0])
@@ -205,6 +214,7 @@ func rows2maps(rows *sql.Rows) (result []map[string]any, err error) {
 	return
 }
 
+// QueryRow query one row
 func QueryRow(ctx context.Context, m api.Module, stack []uint64) {
 	// query
 	queryPtr := uint32(stack[0])
@@ -273,6 +283,7 @@ func QueryRow(ctx context.Context, m api.Module, stack []uint64) {
 	stack[0] = 0
 }
 
+// Exec execute sql
 func Exec(ctx context.Context, m api.Module, stack []uint64) {
 	// query
 	queryPtr := uint32(stack[0])
@@ -334,6 +345,16 @@ func Exec(ctx context.Context, m api.Module, stack []uint64) {
 	if err := allocateBuffer(ctx, m, resultPtr, resultSize, resultBuf); err != nil {
 		log.Printf("[SQL] Exec: allocate buffer error: %s\n", err)
 		stack[0] = 9
+		return
+	}
+	stack[0] = 0
+}
+
+// Close closes the database and prevents new queries from starting
+func Close(ctx context.Context, m api.Module, stack []uint64) {
+	if err := DB.Close(); err != nil {
+		log.Printf("[SQL] Close: %s\n", err)
+		stack[0] = 1
 		return
 	}
 	stack[0] = 0

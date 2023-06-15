@@ -24,7 +24,7 @@ func main() {
 }
 
 func Handler(ctx serverless.Context) {
-	log.Printf("[SFN] ----------------------------------------------------------\n")
+	log.Println("[SFN] ------------------------- BEGIN -------------------------")
 	// load input data
 	tag := ctx.Tag()
 	input := ctx.Data()
@@ -85,6 +85,19 @@ func Handler(ctx serverless.Context) {
 	}
 	log.Printf("[SFN] execute delete result: %+v\n", sqlResult)
 
+	// close
+	err = ctx.SQL().Close()
+	if err != nil {
+		log.Printf("[SFN] database close error: %v\n", err)
+		return
+	}
+	log.Println("[SFN] database close success")
+	// test query on closed database
+	_, err = ctx.SQL().Query("SELECT * FROM message limit 1")
+	if err != nil {
+		log.Printf("[SFN] execute query error: %v, on closed database\n", err)
+	}
+	log.Println("[SFN] -------------------------- END --------------------------")
 	// dump output data
 	// ctx.Write(0x34, []byte(output))
 }

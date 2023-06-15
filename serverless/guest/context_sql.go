@@ -152,6 +152,7 @@ func sqlQueryRow(
 	resultSize *uint32,
 ) uint32
 
+// Exec executes a query without returning any rows
 func (g *GuestSQL) Exec(query string, args ...any) (*serverless.SQLResult, error) {
 	// args
 	var argsPtr uintptr
@@ -209,3 +210,17 @@ func sqlExec(
 	resultPtr **uint32,
 	resultSize *uint32,
 ) uint32
+
+// Close closes the database and prevents new queries from starting
+func (g *GuestSQL) Close() error {
+	ret := sqlClose()
+	if ret != 0 {
+		err := fmt.Errorf("close sql error: %d", ret)
+		log.Printf("[GuestSQL] Close: %s\n", err)
+		return err
+	}
+	return nil
+}
+
+//export yomo_sql_close
+func sqlClose() uint32
