@@ -1,16 +1,17 @@
 package guest
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+
+	"github.com/yomorun/yomo/serverless"
 )
 
 // SQL is a database/sql wrapper
 type GuestSQL struct{}
-
-var ErrNoResult = errors.New("no result")
 
 // Open opens a database specified by its database driver name and a
 // driver-specific data source name, usually consisting of at least a
@@ -131,7 +132,7 @@ func (g *GuestSQL) QueryRow(query string, args ...any) (map[string]any, error) {
 	resultBuf := readBufferFromMemory(resultPtr, resultSize)
 	var result map[string]any
 	if len(resultBuf) == 0 {
-		return nil, ErrNoResult
+		return nil, sql.ErrNoRows
 	}
 	// json decode
 	if err := json.Unmarshal(resultBuf, &result); err != nil {
@@ -143,6 +144,64 @@ func (g *GuestSQL) QueryRow(query string, args ...any) (map[string]any, error) {
 
 //export yomo_sql_query_row
 func sqlQueryRow(
+	queryPtr uintptr,
+	querySize uint32,
+	argsPtr uintptr,
+	argsSize uint32,
+	resultPtr **uint32,
+	resultSize *uint32,
+) uint32
+
+func (g *GuestSQL) Exec(query string, args ...any) (*serverless.SQLResult, error) {
+	// args
+	var argsPtr uintptr
+	var argsSize uint32
+	var hasArgs bool
+	if len(args) > 0 {
+		hasArgs = true
+		argsBuf, err := json.Marshal(args)
+		if err != nil {
+			log.Printf("[GuestSQL] Exec: get args error: %s\n", err)
+			return nil, err
+		}
+		argsPtr, argsSize = bufferToPtrSize(argsBuf)
+	}
+	// query
+	queryPtr, querySize := stringToPtrSize(query)
+	if querySize == 0 {
+		return nil, errors.New("query is empty")
+	}
+	// result
+	var resultPtr *uint32
+	var resultSize uint32
+	var ret uint32
+	if hasArgs {
+		ret = sqlExec(queryPtr, querySize, argsPtr, argsSize, &resultPtr, &resultSize)
+	} else {
+		ret = sqlExec(queryPtr, querySize, 0, 0, &resultPtr, &resultSize)
+	}
+	if ret != 0 {
+		err := fmt.Errorf("execute query error: %d", ret)
+		log.Printf("[GuestSQL] Exec: %s\n", err)
+		return nil, err
+	}
+	resultBuf := readBufferFromMemory(resultPtr, resultSize)
+	if len(resultBuf) == 0 {
+		err := errors.New("execute query error: result is empty")
+		log.Printf("[GuestSQL] Exec: %s\n", err)
+		return nil, err
+	}
+	var result serverless.SQLResult
+	// json decode
+	if err := json.Unmarshal(resultBuf, &result); err != nil {
+		log.Printf("[GuestSQL] Exec: result unmarshal error: %s\n", err)
+		return nil, err
+	}
+	return &result, nil
+}
+
+//export yomo_sql_exec
+func sqlExec(
 	queryPtr uintptr,
 	querySize uint32,
 	argsPtr uintptr,
