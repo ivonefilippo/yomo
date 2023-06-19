@@ -8,15 +8,8 @@ type Context interface {
 	Tag() uint32
 	// Write write data to zipper
 	Write(tag uint32, data []byte) error
-	// HTTP http package
-	HTTP() HTTP
 	// SQL sql package
 	SQL() SQL
-}
-
-// HTTP http interface
-type HTTP interface {
-	Get(url string) uint32
 }
 
 // SQL sql database interface

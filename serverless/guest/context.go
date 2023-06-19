@@ -13,8 +13,6 @@ var (
 	DataTags func() []uint32 = func() []uint32 { return []uint32{0} }
 	// Handler is the handler function for guest
 	Handler func(ctx serverless.Context) = func(serverless.Context) {}
-	// HTTP
-	HTTP = &GuestHTTP{}
 	// SQL
 	SQL = &GuestSQL{}
 )
@@ -37,10 +35,6 @@ func (c *GuestContext) Write(tag uint32, data []byte) error {
 		return errors.New("yomoWrite error")
 	}
 	return nil
-}
-
-func (c *GuestContext) HTTP() serverless.HTTP {
-	return HTTP
 }
 
 func (c *GuestContext) SQL() serverless.SQL {
