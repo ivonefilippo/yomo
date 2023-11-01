@@ -10,7 +10,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -48,9 +47,14 @@ func NewTracerProvider(service string) (*tracesdk.TracerProvider, func(ctx conte
 		return nil, func(context.Context) {}, errors.New("tracing disabled")
 	}
 	// Create the OTLP exporter
-	client := otlptracehttp.NewClient()
-	exp, err := otlptrace.New(context.Background(), client)
+	// headers for baselime
+	headers := map[string]string{
+		"x-api-key": os.Getenv("BASELIME_KEY"),
+	}
+	headersOpt := otlptracehttp.WithHeaders(headers)
+	exp, err := otlptracehttp.New(context.Background(), headersOpt)
 	if err != nil {
+		log.Printf("[trace] create exporter err: %v\n", err)
 		return nil, func(context.Context) {}, err
 	}
 	// tracer provider
