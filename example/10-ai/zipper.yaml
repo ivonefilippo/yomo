@@ -21,6 +21,6 @@ bridge:
         api_key:
         api_endpoint:
 
-      huggingface:
-        model:
+      gemini:
+        api_key:
 
