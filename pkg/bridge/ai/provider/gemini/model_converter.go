@@ -26,19 +26,23 @@ func convertFunctionDeclarationToStandard(functionDefinition *FunctionDeclaratio
 	}
 }
 
-func convertStandardToFunctionParameters(parameters *ai.FunctionParameters) FunctionParameters {
+func convertStandardToFunctionParameters(parameters *ai.FunctionParameters) *FunctionParameters {
 	if parameters == nil {
-		return FunctionParameters{}
+		return nil
 	}
 
-	return FunctionParameters{
+	return &FunctionParameters{
 		Type:       parameters.Type,
 		Properties: convertStandardToProperty(parameters.Properties),
 		Required:   parameters.Required,
 	}
 }
 
-func convertFunctionParametersToStandard(parameters FunctionParameters) *ai.FunctionParameters {
+func convertFunctionParametersToStandard(parameters *FunctionParameters) *ai.FunctionParameters {
+	if parameters == nil {
+		return nil
+	}
+
 	return &ai.FunctionParameters{
 		Type:       parameters.Type,
 		Properties: convertPropertyToStandard(parameters.Properties),
@@ -46,14 +50,14 @@ func convertFunctionParametersToStandard(parameters FunctionParameters) *ai.Func
 	}
 }
 
-func convertStandardToProperty(properties map[string]*ai.ParameterProperty) map[string]Property {
+func convertStandardToProperty(properties map[string]*ai.ParameterProperty) map[string]*Property {
 	if properties == nil {
 		return nil
 	}
 
-	result := make(map[string]Property)
+	result := make(map[string]*Property)
 	for k, v := range properties {
-		result[k] = Property{
+		result[k] = &Property{
 			Type:        v.Type,
 			Description: v.Description,
 		}
@@ -61,7 +65,7 @@ func convertStandardToProperty(properties map[string]*ai.ParameterProperty) map[
 	return result
 }
 
-func convertPropertyToStandard(properties map[string]Property) map[string]*ai.ParameterProperty {
+func convertPropertyToStandard(properties map[string]*Property) map[string]*ai.ParameterProperty {
 	if properties == nil {
 		return nil
 	}

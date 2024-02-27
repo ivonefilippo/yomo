@@ -24,16 +24,16 @@ type Tool struct {
 
 // FunctionDeclaration is the element of Tool
 type FunctionDeclaration struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Parameters  FunctionParameters `json:"parameters"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Parameters  *FunctionParameters `json:"parameters"`
 }
 
 // FunctionParameters is the parameters of FunctionDeclaration
 type FunctionParameters struct {
-	Type       string              `json:"type"`
-	Properties map[string]Property `json:"properties"`
-	Required   []string            `json:"required"`
+	Type       string               `json:"type"`
+	Properties map[string]*Property `json:"properties"`
+	Required   []string             `json:"required"`
 }
 
 // Property is the element of ParameterProperties
