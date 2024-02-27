@@ -13,11 +13,11 @@ type LLMProvider interface {
 	// GetOverview returns the overview of the AI functions, key is the tag, value is the function definition
 	GetOverview() (*ai.OverviewResponse, error)
 	// GetChatCompletions returns the chat completions
-	GetChatCompletions(prompt string) (*ai.ChatCompletionsResponse, error)
+	GetChatCompletions(prompt string) (*ai.InvokeResponse, error)
 	// RegisterFunction registers the llm function
-	RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID string) error
+	RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID uint64) error
 	// UnregisterFunction unregister the llm function
-	UnregisterFunction(name, connID string) error
+	UnregisterFunction(name string, connID uint64) error
 	// ListToolCalls lists the llm tool calls
 	ListToolCalls() (map[uint32]ai.ToolCall, error)
 }
@@ -38,7 +38,7 @@ func RegisterProvider(provider LLMProvider) {
 // ListProviders returns the list of llm providers
 func ListProviders() []string {
 	var names []string
-	providers.Range(func(key, value any) bool {
+	providers.Range(func(key, _ any) bool {
 		names = append(names, key.(string))
 		return true
 	})

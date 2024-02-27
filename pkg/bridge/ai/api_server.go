@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	// DefaultZipperAddr is the default endpoint of the zipper
 	DefaultZipperAddr = "localhost:9000"
 )
 
@@ -78,7 +79,7 @@ func (a *BasicAPIServer) Serve() error {
 	}
 
 	// GET /overview
-	handler.HandleFunc("/overview", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/overview", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// credential := getBearerToken(r)
 		resp, err := service.GetOverview()
@@ -111,7 +112,7 @@ func (a *BasicAPIServer) Serve() error {
 		}
 		ylog.Info("reqID", "val", reqID)
 
-		var req ai.BasicAPIRequest
+		var req ai.InvokeRequest
 		req.ReqID = reqID
 
 		// // set json response
@@ -151,6 +152,7 @@ func (a *BasicAPIServer) Serve() error {
 					ToolCallID:   fn.ID,
 					Arguments:    fn.Function.Arguments,
 					FunctionName: fn.Function.Name,
+					IsOK:         true,
 				}
 				buf, err := data.Bytes()
 				if err != nil {

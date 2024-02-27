@@ -1,9 +1,9 @@
+// Package azopenai is used to provide the Azure OpenAI service
 package azopenai
 
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,32 +11,28 @@ import (
 	"sync"
 
 	_ "github.com/joho/godotenv/autoload"
+
 	"github.com/yomorun/yomo/ai"
 	"github.com/yomorun/yomo/core/ylog"
 )
 
-var (
-	// tools             map[uint32]ai.ToolCall
-	fns sync.Map
-	// mu                sync.Mutex
-	ErrNoFunctionCall = errors.New("no function call")
-)
+var fns sync.Map
 
-// RequestMessage is the message in Request
+// ReqMessage is the message in Request
 type ReqMessage struct {
 	Role       string `json:"role"`
 	Content    string `json:"content"`
 	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
-// RequestBody is the request body
+// ReqBody is the request body
 type ReqBody struct {
 	Messages []ReqMessage  `json:"messages"`
 	Tools    []ai.ToolCall `json:"tools"` // chatCompletionTool
 	// ToolChoice string    `json:"tool_choice"` // chatCompletionFunction
 }
 
-// Resp is the response body
+// RespBody is the response body
 type RespBody struct {
 	ID                string       `json:"id"`
 	Object            string       `json:"object"`
@@ -75,17 +71,13 @@ type AzureOpenAIProvider struct {
 }
 
 type connectedFn struct {
-	connID string
+	connID uint64
 	tag    uint32
 	tc     ai.ToolCall
 }
 
 func init() {
-	// tools = make(map[uint32]ai.ToolCall)
 	fns = sync.Map{}
-	// ai.RegisterProvider(NewAzureOpenAIProvider("api-key", "api-endpoint"))
-	// TEST: for test
-	// bridgeai.RegisterProvider(New())
 }
 
 // NewAzureOpenAIProvider creates a new AzureOpenAIProvider
@@ -110,16 +102,16 @@ func (p *AzureOpenAIProvider) Name() string {
 }
 
 // GetChatCompletions get chat completions for ai service
-func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.ChatCompletionsResponse, error) {
+func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.InvokeResponse, error) {
 	isEmpty := true
-	fns.Range(func(key, value interface{}) bool {
+	fns.Range(func(_, _ interface{}) bool {
 		isEmpty = false
 		return false
 	})
 
 	if isEmpty {
 		ylog.Error("-----tools is empty")
-		return &ai.ChatCompletionsResponse{Content: "no toolcalls"}, ErrNoFunctionCall
+		return &ai.InvokeResponse{Content: "no toolcalls"}, ai.ErrNoFunctionCall
 	}
 
 	// messages
@@ -133,7 +125,7 @@ func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.Ch
 	// for _, v := range tools {
 	// 	toolCalls = append(toolCalls, v)
 	// }
-	fns.Range(func(key, value interface{}) bool {
+	fns.Range(func(_, value interface{}) bool {
 		fn := value.(*connectedFn)
 		toolCalls = append(toolCalls, fn.tc)
 		return true
@@ -193,10 +185,10 @@ func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.Ch
 
 	ylog.Debug("--response calls", "calls", calls)
 
-	result := &ai.ChatCompletionsResponse{}
+	result := &ai.InvokeResponse{}
 	if len(calls) == 0 {
 		result.Content = content
-		return result, ErrNoFunctionCall
+		return result, ai.ErrNoFunctionCall
 	}
 
 	// functions may be more than one
@@ -205,18 +197,13 @@ func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.Ch
 		fns.Range(func(key, value interface{}) bool {
 			fn := value.(*connectedFn)
 			if fn.tc.Equal(&call) {
-				// if result.Functions == nil {
-				// 	result.Functions = make(map[uint32][]*ai.FunctionDefinition)
-				// }
 				// Use toolCalls because tool_id is required in the following llm request
 				if result.ToolCalls == nil {
 					result.ToolCalls = make(map[uint32][]*ai.ToolCall)
 				}
-				// result.Functions[fn.tag] = append(result.Functions[fn.tag], call.Function)
 
-				// fix: should push the `call` instead of `call.Function` as describes in
+				// push the `call` instead of `call.Function` as describes in
 				// https://cookbook.openai.com/examples/function_calling_with_an_openapi_spec
-				// Create a new variable to hold the current call
 				currentCall := call
 				result.ToolCalls[fn.tag] = append(result.ToolCalls[fn.tag], &currentCall)
 			}
@@ -226,13 +213,13 @@ func (p *AzureOpenAIProvider) GetChatCompletions(userInstruction string) (*ai.Ch
 
 	// sfn maybe disconnected, so we need to check if there is any function call
 	if len(result.ToolCalls) == 0 {
-		return nil, ErrNoFunctionCall
+		return nil, ai.ErrNoFunctionCall
 	}
 	return result, nil
 }
 
 // RegisterFunction register function
-func (p *AzureOpenAIProvider) RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID string) error {
+func (p *AzureOpenAIProvider) RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID uint64) error {
 	fns.Store(connID, &connectedFn{
 		connID: connID,
 		tag:    tag,
@@ -247,7 +234,7 @@ func (p *AzureOpenAIProvider) RegisterFunction(tag uint32, functionDefinition *a
 
 // UnregisterFunction unregister function
 // Be careful: a function can have multiple instances, remove the offline instance only.
-func (p *AzureOpenAIProvider) UnregisterFunction(name string, connID string) error {
+func (p *AzureOpenAIProvider) UnregisterFunction(_ string, connID uint64) error {
 	fns.Delete(connID)
 	return nil
 }
@@ -255,7 +242,7 @@ func (p *AzureOpenAIProvider) UnregisterFunction(name string, connID string) err
 // ListToolCalls list tool functions
 func (p *AzureOpenAIProvider) ListToolCalls() (map[uint32]ai.ToolCall, error) {
 	tmp := make(map[uint32]ai.ToolCall)
-	fns.Range(func(key, value any) bool {
+	fns.Range(func(_, value any) bool {
 		fn := value.(*connectedFn)
 		tmp[fn.tag] = fn.tc
 		return true
@@ -267,7 +254,7 @@ func (p *AzureOpenAIProvider) ListToolCalls() (map[uint32]ai.ToolCall, error) {
 // GetOverview get overview for ai service
 func (p *AzureOpenAIProvider) GetOverview() (*ai.OverviewResponse, error) {
 	isEmpty := true
-	fns.Range(func(key, value any) bool {
+	fns.Range(func(_, _ any) bool {
 		isEmpty = false
 		return false
 	})
@@ -280,7 +267,7 @@ func (p *AzureOpenAIProvider) GetOverview() (*ai.OverviewResponse, error) {
 		return result, nil
 	}
 
-	fns.Range(func(key, value any) bool {
+	fns.Range(func(_, value any) bool {
 		fn := value.(*connectedFn)
 		result.Functions[fn.tag] = fn.tc.Function
 		return true
