@@ -1,11 +1,15 @@
 package gemini
 
+// RequestBody is the request body
 type RequestBody struct {
-	Contents struct {
-		Role  string `json:"role"`
-		Parts Parts  `json:"parts"`
-	} `json:"contents"`
-	Tools []Tool `json:"tools"`
+	Contents Contents `json:"contents"`
+	Tools    []Tool   `json:"tools"`
+}
+
+// Contents is the contents in RequestBody
+type Contents struct {
+	Role  string `json:"role"`
+	Parts Parts  `json:"parts"`
 }
 
 // Parts is the contents.parts in RequestBody
@@ -15,7 +19,7 @@ type Parts struct {
 
 // Tool is the element of tools in RequestBody
 type Tool struct {
-	FunctionDeclarations []FunctionDeclaration `json:"function_declarations"`
+	FunctionDeclarations []*FunctionDeclaration `json:"function_declarations"`
 }
 
 // FunctionDeclaration is the element of Tool
@@ -28,17 +32,8 @@ type FunctionDeclaration struct {
 // FunctionParameters is the parameters of FunctionDeclaration
 type FunctionParameters struct {
 	Type       string              `json:"type"`
-	Properties ParameterProperties `json:"properties"`
+	Properties map[string]Property `json:"properties"`
 	Required   []string            `json:"required"`
-}
-
-// ParameterProperties is the properties of FunctionParameters
-type ParameterProperties struct {
-	Location    Property `json:"location"`
-	Description Property `json:"description"`
-	Movie       Property `json:"movie"`
-	Theater     Property `json:"theater"`
-	Date        Property `json:"date"`
 }
 
 // Property is the element of ParameterProperties

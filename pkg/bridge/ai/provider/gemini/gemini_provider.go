@@ -21,7 +21,7 @@ var (
 type connectedFn struct {
 	connID uint64
 	tag    uint32
-	tc     Tool
+	fd     *FunctionDeclaration
 }
 
 func init() {
@@ -62,13 +62,15 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	body.Contents.Parts.Text = userInstruction
 
 	// prepare tools
-	toolCalls := make([]Tool, 0)
+	toolCalls := make([]*FunctionDeclaration, 0)
 	fns.Range(func(_, value interface{}) bool {
 		fn := value.(*connectedFn)
-		toolCalls = append(toolCalls, fn.tc)
+		toolCalls = append(toolCalls, fn.fd)
 		return true
 	})
-	body.Tools = toolCalls
+	body.Tools = append(make([]Tool, 0), Tool{
+		FunctionDeclarations: toolCalls,
+	})
 
 	// request API
 	jsonBody, err := json.Marshal(body)
@@ -138,22 +140,58 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 
 // RegisterFunction registers the llm function
 func (p *GeminiProvider) RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID uint64) error {
+	fns.Store(connID, &connectedFn{
+		connID: connID,
+		tag:    tag,
+		fd:     convertStandardToFunctionDeclaration(functionDefinition),
+	})
+
 	return nil
 }
 
 // UnregisterFunction unregister the llm function
 func (p *GeminiProvider) UnregisterFunction(name string, connID uint64) error {
+	fns.Delete(connID)
 	return nil
 }
 
 // ListToolCalls lists the llm tool calls
 func (p *GeminiProvider) ListToolCalls() (map[uint32]ai.ToolCall, error) {
-	return nil, nil
+	result := make(map[uint32]ai.ToolCall)
+
+	tmp := make(map[uint32]*FunctionDeclaration)
+	fns.Range(func(_, value any) bool {
+		fn := value.(*connectedFn)
+		tmp[fn.tag] = fn.fd
+		return true
+	})
+
+	return result, nil
 }
 
 // GetOverview returns the overview of the AI functions, key is the tag, value is the function definition
 func (p *GeminiProvider) GetOverview() (*ai.OverviewResponse, error) {
-	return nil, nil
+	isEmpty := true
+	fns.Range(func(_, _ any) bool {
+		isEmpty = false
+		return false
+	})
+
+	result := &ai.OverviewResponse{
+		Functions: make(map[uint32]*ai.FunctionDefinition),
+	}
+
+	if isEmpty {
+		return result, nil
+	}
+
+	fns.Range(func(_, value any) bool {
+		fn := value.(*connectedFn)
+		result.Functions[fn.tag] = convertFunctionDeclarationToStandard(fn.fd)
+		return true
+	})
+
+	return result, nil
 }
 
 // getApiUrl returns the gemini generateContent API url
