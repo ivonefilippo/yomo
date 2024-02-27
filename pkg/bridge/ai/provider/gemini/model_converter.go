@@ -1,6 +1,10 @@
 package gemini
 
-import "github.com/yomorun/yomo/ai"
+import (
+	"encoding/json"
+
+	"github.com/yomorun/yomo/ai"
+)
 
 func convertStandardToFunctionDeclaration(functionDefinition *ai.FunctionDefinition) *FunctionDeclaration {
 	if functionDefinition == nil {
@@ -78,4 +82,48 @@ func convertPropertyToStandard(properties map[string]*Property) map[string]*ai.P
 		}
 	}
 	return result
+}
+
+// generateJSONSchemaArguments generates the JSON schema arguments from OpenAPI compatible arguments
+// https://ai.google.dev/docs/function_calling#how_it_works
+func generateJSONSchemaArguments(args Args) string {
+	schema := make(map[string]interface{})
+
+	for k, v := range args {
+		schema[k] = v
+	}
+
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		return ""
+	}
+
+	return string(schemaJSON)
+}
+
+func parseAPIResponseBody(respBody []byte) ([]*Response, error) {
+	var response []*Response
+	err := json.Unmarshal(respBody, &response)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func parseToolCallFromResponse(response []*Response) []*ai.ToolCall {
+	calls := make([]*ai.ToolCall, 0)
+	for _, candidate := range response[0].Candidates {
+		fn := candidate.Content.Parts[0].FunctionCall
+		fd := &ai.FunctionDefinition{
+			Name:      fn.Name,
+			Arguments: generateJSONSchemaArguments(fn.Args),
+		}
+		call := &ai.ToolCall{
+			ID:       "cc-gemini-id",
+			Type:     "cc-function",
+			Function: fd,
+		}
+		calls = append(calls, call)
+	}
+	return calls
 }

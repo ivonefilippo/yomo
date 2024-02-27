@@ -106,32 +106,17 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	}
 
 	// parse response
-	var response []Response
-	err = json.Unmarshal(respBody, &response)
+	response, err := parseAPIResponseBody(respBody)
 	if err != nil {
-		fmt.Println("Error parsing response body:", err)
 		return nil, err
 	}
 
-	// Now you can access the data in the response
-	calls := make([]ai.ToolCall, 0)
+	// get all candidates as []*ai.ToolCall
+	calls := parseToolCallFromResponse(response)
+
 	result := &ai.InvokeResponse{}
 	if len(calls) == 0 {
 		return result, ai.ErrNoFunctionCall
-	}
-	for _, candidate := range response[0].Candidates {
-		fn := candidate.Content.Parts[0].FunctionCall
-		call := ai.ToolCall{
-			ID:   "cc-gemini-id",
-			Type: "cc-function",
-			Function: &ai.FunctionDefinition{
-				Name:      fn.Name,
-				Arguments: p.generateJSONSchemaArguments(fn.Args),
-			},
-		}
-		fmt.Printf("Function name: %s", fn.Name)
-		fmt.Printf("Function args: %+v", fn.Args)
-		calls = append(calls, call)
 	}
 
 	// messages
@@ -163,6 +148,9 @@ func (p *GeminiProvider) ListToolCalls() (map[uint32]ai.ToolCall, error) {
 	fns.Range(func(_, value any) bool {
 		fn := value.(*connectedFn)
 		tmp[fn.tag] = fn.fd
+		result[fn.tag] = ai.ToolCall{
+			Function: convertFunctionDeclarationToStandard(fn.fd),
+		}
 		return true
 	})
 
@@ -197,23 +185,6 @@ func (p *GeminiProvider) GetOverview() (*ai.OverviewResponse, error) {
 // getApiUrl returns the gemini generateContent API url
 func (p *GeminiProvider) getApiUrl() string {
 	return fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=%s", p.APIKey)
-}
-
-// generateJSONSchemaArguments generates the JSON schema arguments from OpenAPI compatible arguments
-// https://ai.google.dev/docs/function_calling#how_it_works
-func (p *GeminiProvider) generateJSONSchemaArguments(args Args) string {
-	schema := make(map[string]interface{})
-
-	for k, v := range args {
-		schema[k] = v
-	}
-
-	schemaJSON, err := json.Marshal(schema)
-	if err != nil {
-		return ""
-	}
-
-	return string(schemaJSON)
 }
 
 // NewGeminiProvider creates a new GeminiProvider
