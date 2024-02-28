@@ -3,7 +3,6 @@ package openai
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,10 +16,7 @@ import (
 
 const APIEndpoint = "https://api.openai.com/v1/chat/completions"
 
-var (
-	fns               sync.Map
-	ErrNoFunctionCall = errors.New("no function call")
-)
+var fns sync.Map
 
 // Message
 type ChatCompletionMessage struct {
@@ -118,7 +114,7 @@ func (p *OpenAIProvider) Name() string {
 func (p *OpenAIProvider) GetChatCompletions(userInstruction string) (*ai.InvokeResponse, error) {
 	toolCalls, ok := hasToolCalls()
 	if !ok {
-		ylog.Error(ErrNoFunctionCall.Error())
+		ylog.Error(ai.ErrNoFunctionCall.Error())
 		return &ai.InvokeResponse{Content: "no toolcalls"}, ai.ErrNoFunctionCall
 	}
 
@@ -182,7 +178,7 @@ func (p *OpenAIProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	result := &ai.InvokeResponse{}
 	if len(calls) == 0 {
 		result.Content = content
-		return result, ErrNoFunctionCall
+		return result, ai.ErrNoFunctionCall
 	}
 
 	// functions may be more than one
