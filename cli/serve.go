@@ -30,6 +30,7 @@ import (
 	"github.com/yomorun/yomo/pkg/bridge/ai"
 	"github.com/yomorun/yomo/pkg/bridge/ai/provider/azopenai"
 	"github.com/yomorun/yomo/pkg/bridge/ai/provider/gemini"
+	"github.com/yomorun/yomo/pkg/bridge/ai/provider/openai"
 )
 
 // serveCmd represents the serve command
@@ -134,10 +135,14 @@ func registerAIProvider(aiConfig *ai.Config) {
 				ai.RegisterProvider(azopenai.NewAzureOpenAIProvider(apiKey, apiEndpoint))
 			}
 		}
+		// register the Gemini provider
 		if name == "gemini" {
 			ai.RegisterProvider(gemini.NewProvider(provider["api_key"]))
 		}
-		// TODO: register other providers
+		// register the OpenAI provider
+		if name == "openai" {
+			ai.RegisterProvider(openai.NewProvider(provider["api_key"], provider["model"]))
+		}
 	}
 }
 
