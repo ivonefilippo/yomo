@@ -135,12 +135,7 @@ func registerAIProvider(aiConfig *ai.Config) {
 			}
 		}
 		if name == "gemini" {
-			apiKey := provider["api_key"]
-			if apiKey == "" {
-				ai.RegisterProvider(gemini.New())
-			} else {
-				ai.RegisterProvider(gemini.NewGeminiProvider(apiKey))
-			}
+			ai.RegisterProvider(gemini.NewProvider(provider["api_key"]))
 		}
 		// TODO: register other providers
 	}

@@ -15,9 +15,7 @@ import (
 	baseProvider "github.com/yomorun/yomo/pkg/bridge/ai"
 )
 
-var (
-	fns sync.Map
-)
+var fns sync.Map
 
 type connectedFn struct {
 	connID uint64
@@ -226,16 +224,16 @@ func (p *GeminiProvider) prepareRequestBody(userInstruction string) *RequestBody
 	return body
 }
 
-// NewGeminiProvider creates a new GeminiProvider
-func NewGeminiProvider(apiKey string) *GeminiProvider {
-	return &GeminiProvider{
+// NewProvider creates a new GeminiProvider
+func NewProvider(apiKey string) *GeminiProvider {
+	if apiKey == "" {
+		apiKey = os.Getenv("GEMINI_API_KEY")
+	}
+	p := &GeminiProvider{
 		APIKey: apiKey,
 	}
-}
+	apiURL := p.getApiUrl()
+	ylog.Debug("new gemini provider", "api_endpoint", apiURL)
 
-// New creates a new GeminiProvider
-func New() *GeminiProvider {
-	return &GeminiProvider{
-		APIKey: os.Getenv("GEMINI_API_KEY"),
-	}
+	return p
 }

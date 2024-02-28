@@ -36,39 +36,39 @@ func TestGeminiProvider_getApiUrl(t *testing.T) {
 	}
 }
 
-func TestNewGeminiProvider(t *testing.T) {
+func TestNewProvider(t *testing.T) {
 	apiKey := "test-api-key"
-	provider := NewGeminiProvider(apiKey)
+	provider := NewProvider(apiKey)
 
 	if provider.APIKey != apiKey {
-		t.Errorf("NewGeminiProvider() = %v, want %v", provider.APIKey, apiKey)
+		t.Errorf("NewProvider() = %v, want %v", provider.APIKey, apiKey)
 	}
 }
 
-func TestNew(t *testing.T) {
+func TestNewProviderWithEnvVar(t *testing.T) {
 	// Set up
 	expectedAPIKey := "test-api-key"
 	os.Setenv("GEMINI_API_KEY", expectedAPIKey)
 
 	// Call the function under test
-	provider := New()
+	provider := NewProvider("")
 
 	// Check the result
 	if provider.APIKey != expectedAPIKey {
-		t.Errorf("New() = %v, want %v", provider.APIKey, expectedAPIKey)
+		t.Errorf("NewProvider() = %v, want %v", provider.APIKey, expectedAPIKey)
 	}
 }
 
-func TestNew_NoEnvVar(t *testing.T) {
+func TestNewProviderWithoutEnvVar(t *testing.T) {
 	// Set up
 	os.Unsetenv("GEMINI_API_KEY")
 
 	// Call the function under test
-	provider := New()
+	provider := NewProvider("")
 
 	// Check the result
 	if provider.APIKey != "" {
-		t.Errorf("New() = %v, want %v", provider.APIKey, "")
+		t.Errorf("NewProvider() = %v, want %v", provider.APIKey, "")
 	}
 }
 
@@ -76,7 +76,6 @@ func TestGeminiProvider_GetOverview_Empty(t *testing.T) {
 	provider := &GeminiProvider{}
 
 	result, err := provider.GetOverview()
-
 	if err != nil {
 		t.Errorf("GetOverview() error = %v, wantErr %v", err, nil)
 		return
@@ -108,7 +107,6 @@ func TestGeminiProvider_GetOverview_NotEmpty(t *testing.T) {
 	})
 
 	result, err := provider.GetOverview()
-
 	if err != nil {
 		t.Errorf("GetOverview() error = %v, wantErr %v", err, nil)
 		return
@@ -124,7 +122,6 @@ func TestGeminiProvider_ListToolCalls_Empty(t *testing.T) {
 	provider := &GeminiProvider{}
 
 	result, err := provider.ListToolCalls()
-
 	if err != nil {
 		t.Errorf("ListToolCalls() error = %v, wantErr %v", err, nil)
 		return
@@ -156,7 +153,6 @@ func TestGeminiProvider_ListToolCalls_NotEmpty(t *testing.T) {
 	})
 
 	result, err := provider.ListToolCalls()
-
 	if err != nil {
 		t.Errorf("ListToolCalls() error = %v, wantErr %v", err, nil)
 		return
@@ -188,7 +184,6 @@ func TestGeminiProvider_RegisterFunction(t *testing.T) {
 	}
 
 	err := provider.RegisterFunction(tag, functionDefinition, connID)
-
 	if err != nil {
 		t.Errorf("RegisterFunction() error = %v, wantErr %v", err, nil)
 		return
@@ -232,7 +227,6 @@ func TestGeminiProvider_UnregisterFunction(t *testing.T) {
 	})
 
 	err := provider.UnregisterFunction("function1", connID)
-
 	if err != nil {
 		t.Errorf("UnregisterFunction() error = %v, wantErr %v", err, nil)
 		return

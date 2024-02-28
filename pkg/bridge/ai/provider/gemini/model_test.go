@@ -343,7 +343,7 @@ func TestParseToolCallFromResponse(t *testing.T) {
 		},
 	}
 
-	expected := []*ai.ToolCall{
+	expected := []ai.ToolCall{
 		{
 			Function: &ai.FunctionDefinition{
 				Name:      "find_theaters",
