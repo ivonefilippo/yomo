@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/yomorun/yomo/ai"
+	"github.com/yomorun/yomo/core/ylog"
 )
 
 func convertStandardToFunctionDeclaration(functionDefinition *ai.FunctionDefinition) *FunctionDeclaration {
@@ -86,7 +87,7 @@ func convertPropertyToStandard(properties map[string]*Property) map[string]*ai.P
 
 // generateJSONSchemaArguments generates the JSON schema arguments from OpenAPI compatible arguments
 // https://ai.google.dev/docs/function_calling#how_it_works
-func generateJSONSchemaArguments(args Args) string {
+func generateJSONSchemaArguments(args map[string]interface{}) string {
 	schema := make(map[string]interface{})
 
 	for k, v := range args {
@@ -101,24 +102,25 @@ func generateJSONSchemaArguments(args Args) string {
 	return string(schemaJSON)
 }
 
-func parseAPIResponseBody(respBody []byte) ([]*Response, error) {
-	var response []*Response
+func parseAPIResponseBody(respBody []byte) (*Response, error) {
+	var response *Response
 	err := json.Unmarshal(respBody, &response)
 	if err != nil {
+		ylog.Error("parseAPIResponseBody", "err", err, "respBody", string(respBody))
 		return nil, err
 	}
 	return response, nil
 }
 
-func parseToolCallFromResponse(response []*Response) []*ai.ToolCall {
-	calls := make([]*ai.ToolCall, 0)
-	for _, candidate := range response[0].Candidates {
+func parseToolCallFromResponse(response *Response) []ai.ToolCall {
+	calls := make([]ai.ToolCall, 0)
+	for _, candidate := range response.Candidates {
 		fn := candidate.Content.Parts[0].FunctionCall
 		fd := &ai.FunctionDefinition{
 			Name:      fn.Name,
 			Arguments: generateJSONSchemaArguments(fn.Args),
 		}
-		call := &ai.ToolCall{
+		call := ai.ToolCall{
 			ID:       "cc-gemini-id",
 			Type:     "cc-function",
 			Function: fd,

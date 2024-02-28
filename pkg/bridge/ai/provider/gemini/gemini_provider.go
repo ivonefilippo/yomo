@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/yomorun/yomo/ai"
@@ -60,12 +61,15 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	// request API
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
-		fmt.Println("Error preparing request body:", err)
+		ylog.Error(err.Error())
 		return nil, err
 	}
 
+	ylog.Debug("gemini api request", "body", string(jsonBody))
+
 	req, err := http.NewRequest("POST", p.getApiUrl(), bytes.NewBuffer(jsonBody))
 	if err != nil {
+		ylog.Error(err.Error())
 		fmt.Println("Error creating new request:", err)
 		return nil, err
 	}
@@ -75,6 +79,7 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		ylog.Error(err.Error())
 		fmt.Println("Error making request:", err)
 		return nil, err
 	}
@@ -82,6 +87,7 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		ylog.Error(err.Error())
 		fmt.Println("Error reading response body:", err)
 		return nil, err
 	}
@@ -90,18 +96,38 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 		return nil, fmt.Errorf("gemini provider api response status code is %d", resp.StatusCode)
 	}
 
+	ylog.Debug("gemini api response", "body", string(respBody))
+
 	// parse response
 	response, err := parseAPIResponseBody(respBody)
 	if err != nil {
+		ylog.Error(err.Error())
 		return nil, err
 	}
 
 	// get all candidates as []*ai.ToolCall
 	calls := parseToolCallFromResponse(response)
 
+	ylog.Debug("gemini api response", "calls", len(calls))
+
 	result := &ai.InvokeResponse{}
 	if len(calls) == 0 {
 		return result, ai.ErrNoFunctionCall
+	}
+
+	result.ToolCalls = make(map[uint32][]*ai.ToolCall)
+	for _, call := range calls {
+		ylog.Debug("++call", "call", call.Function.Name, "call", call.Function.Arguments)
+		fns.Range(func(_, value interface{}) bool {
+			fn := value.(*connectedFn)
+			ylog.Debug("-->", "call.Function.Name", call.Function.Name, "fns.fd.Name", fn.fd.Name)
+			if call.Function.Name == fn.fd.Name {
+				ylog.Debug("-----> add function", "name", fn.fd.Name, "tag", fn.tag)
+				currentCall := call
+				result.ToolCalls[fn.tag] = append(result.ToolCalls[fn.tag], &currentCall)
+			}
+			return true
+		})
 	}
 
 	// messages
@@ -110,6 +136,9 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 
 // RegisterFunction registers the llm function
 func (p *GeminiProvider) RegisterFunction(tag uint32, functionDefinition *ai.FunctionDefinition, connID uint64) error {
+	// replace "-" in functionDefinition.Name to "_" as gemini does not support "-"
+	functionDefinition.Name = strings.Replace(functionDefinition.Name, "-", "_", -1)
+
 	fns.Store(connID, &connectedFn{
 		connID: connID,
 		tag:    tag,

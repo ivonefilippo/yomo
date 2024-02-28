@@ -212,7 +212,7 @@ func TestConvertStandardToFunctionDeclaration_NilInput(t *testing.T) {
 }
 
 func TestGenerateJSONSchemaArguments(t *testing.T) {
-	args := Args{
+	args := map[string]interface{}{
 		"arg1": "value1",
 		"arg2": "value2",
 	}
@@ -227,7 +227,7 @@ func TestGenerateJSONSchemaArguments(t *testing.T) {
 }
 
 func TestGenerateJSONSchemaArguments_EmptyArgs(t *testing.T) {
-	args := Args{}
+	args := map[string]interface{}{}
 
 	expected := `{}`
 
@@ -239,78 +239,27 @@ func TestGenerateJSONSchemaArguments_EmptyArgs(t *testing.T) {
 }
 
 func TestParseAPIResponseBody(t *testing.T) {
-	respBody := []byte(`[{
-		"candidates": [
+	respBody := []byte(`{"candidates":[{"content":{"parts":[{"functionCall":{"name":"converter","args":{"timeString":"1900-01-01 07:00:00","targetTimezone":"Asia/Singapore","sourceTimezone":"America/Los_Angeles"}}}],"role":"model"},"finishReason":"STOP","index":0}],"promptFeedback":{"safetyRatings":[{"category":"HARM_CATEGORY_SEXUALLY_EXPLICIT","probability":"NEGLIGIBLE"},{"category":"HARM_CATEGORY_HATE_SPEECH","probability":"NEGLIGIBLE"},{"category":"HARM_CATEGORY_HARASSMENT","probability":"NEGLIGIBLE"},{"category":"HARM_CATEGORY_DANGEROUS_CONTENT","probability":"NEGLIGIBLE"}]}}`)
+	expected := &Response{
+		Candidates: []Candidate{
 			{
-				"content": {
-					"parts": [
+				Content: &CandidateContent{
+					Parts: []*Part{
 						{
-							"functionCall": {
-								"name": "find_theaters",
-								"args": {
-									"movie": "Barbie",
-									"location": "Mountain View, CA"
-								}
-							}
-						}
-					]
-				},
-				"finishReason": "STOP",
-				"safetyRatings": [
-					{
-						"category": "HARM_CATEGORY_HARASSMENT",
-						"probability": "NEGLIGIBLE"
-					},
-					{
-						"category": "HARM_CATEGORY_HATE_SPEECH",
-						"probability": "NEGLIGIBLE"
-					},
-					{
-						"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-						"probability": "NEGLIGIBLE"
-					},
-					{
-						"category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-						"probability": "NEGLIGIBLE"
-					}
-				]
-			}
-		],
-		"usageMetadata": {
-			"promptTokenCount": 9,
-			"totalTokenCount": 9
-		}
-	}]`)
-
-	expected := []*Response{
-		{
-			Candidates: []Candidate{
-				{
-					Content: CandidateContent{
-						Parts: []Part{
-							{
-								FunctionCall: FunctionCall{
-									Name: "find_theaters",
-									Args: map[string]interface{}{
-										"movie":    "Barbie",
-										"location": "Mountain View, CA",
-									},
+							FunctionCall: &FunctionCall{
+								Name: "converter",
+								Args: map[string]interface{}{
+									"timeString":     "1900-01-01 07:00:00",
+									"targetTimezone": "Asia/Singapore",
+									"sourceTimezone": "America/Los_Angeles",
 								},
 							},
 						},
 					},
-					FinishReason: "STOP",
-					SafetyRatings: []CandidateSafetyRating{
-						{Category: "HARM_CATEGORY_HARASSMENT", Probability: "NEGLIGIBLE"},
-						{Category: "HARM_CATEGORY_HATE_SPEECH", Probability: "NEGLIGIBLE"},
-						{Category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", Probability: "NEGLIGIBLE"},
-						{Category: "HARM_CATEGORY_DANGEROUS_CONTENT", Probability: "NEGLIGIBLE"},
-					},
+					Role: "model",
 				},
-			},
-			UsageMetadata: UsageMetadata{
-				PromptTokenCount: 9,
-				TotalTokenCount:  9,
+				FinishReason: "STOP",
+				Index:        0,
 			},
 		},
 	}
@@ -320,7 +269,7 @@ func TestParseAPIResponseBody(t *testing.T) {
 		t.Fatalf("parseAPIResponseBody() error = %v, wantErr %v", err, false)
 	}
 
-	if !reflect.DeepEqual(result, expected) {
+	if !reflect.DeepEqual(result.Candidates, expected.Candidates) {
 		t.Errorf("parseAPIResponseBody() = %v, want %v", result, expected)
 	}
 }
@@ -334,20 +283,57 @@ func TestParseAPIResponseBody_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestParseAPIResponseBody_JSON(t *testing.T) {
+	str := "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"converter\",\n              \"args\": {\n                \"timeString\": \"1900-01-01 07:00:00\",\n                \"targetTimezone\": \"Asia/Singapore\",\n                \"sourceTimezone\": \"America/Los_Angeles\"\n              }\n            }\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"promptFeedback\": {\n    \"safetyRatings\": [\n      {\n        \"category\": \"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\n        \"probability\": \"NEGLIGIBLE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_HATE_SPEECH\",\n        \"probability\": \"NEGLIGIBLE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_HARASSMENT\",\n        \"probability\": \"NEGLIGIBLE\"\n      },\n      {\n        \"category\": \"HARM_CATEGORY_DANGEROUS_CONTENT\",\n        \"probability\": \"NEGLIGIBLE\"\n      }\n    ]\n  }\n}\n"
+
+	respBody := []byte(str)
+
+	expected := &Response{
+		Candidates: []Candidate{
+			{
+				Content: &CandidateContent{
+					Parts: []*Part{
+						{
+							FunctionCall: &FunctionCall{
+								Name: "converter",
+								Args: map[string]interface{}{
+									"timeString":     "1900-01-01 07:00:00",
+									"targetTimezone": "Asia/Singapore",
+									"sourceTimezone": "America/Los_Angeles",
+								},
+							},
+						},
+					},
+					Role: "model",
+				},
+				FinishReason: "STOP",
+				Index:        0,
+			},
+		},
+	}
+
+	result, err := parseAPIResponseBody(respBody)
+	if err != nil {
+		t.Fatalf("parseAPIResponseBody() error = %v, wantErr %v", err, false)
+	}
+
+	if !reflect.DeepEqual(result.Candidates, expected.Candidates) {
+		t.Errorf("parseAPIResponseBody() = %v, want %v", result, expected)
+	}
+}
+
 func TestParseToolCallFromResponse(t *testing.T) {
-	resp := []*Response{
-		{
-			Candidates: []Candidate{
-				{
-					Content: CandidateContent{
-						Parts: []Part{
-							{
-								FunctionCall: FunctionCall{
-									Name: "find_theaters",
-									Args: map[string]interface{}{
-										"location": "Mountain View, CA",
-										"movie":    "Barbie",
-									},
+	resp := &Response{
+		Candidates: []Candidate{
+			{
+				Content: &CandidateContent{
+					Parts: []*Part{
+						{
+							FunctionCall: &FunctionCall{
+								Name: "find_theaters",
+								Args: map[string]interface{}{
+									"location": "Mountain View, CA",
+									"movie":    "Barbie",
 								},
 							},
 						},
