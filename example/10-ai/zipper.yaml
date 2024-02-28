@@ -14,8 +14,10 @@ bridge:
 
     providers:
       azopenai:
-        api_key: 
         api_endpoint: 
+        deployment_id: 
+        api_key: 
+        api_version: 
 
       openai:
         api_key:
@@ -23,4 +25,3 @@ bridge:
 
       gemini:
         api_key:
-
