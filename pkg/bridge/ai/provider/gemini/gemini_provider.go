@@ -55,22 +55,7 @@ func (p *GeminiProvider) GetChatCompletions(userInstruction string) (*ai.InvokeR
 	}
 
 	// prepare request body
-	body := &RequestBody{}
-
-	// prepare contents
-	body.Contents.Role = "user"
-	body.Contents.Parts.Text = userInstruction
-
-	// prepare tools
-	toolCalls := make([]*FunctionDeclaration, 0)
-	fns.Range(func(_, value interface{}) bool {
-		fn := value.(*connectedFn)
-		toolCalls = append(toolCalls, fn.fd)
-		return true
-	})
-	body.Tools = append(make([]Tool, 0), Tool{
-		FunctionDeclarations: toolCalls,
-	})
+	body := p.prepareRequestBody(userInstruction)
 
 	// request API
 	jsonBody, err := json.Marshal(body)
@@ -185,6 +170,31 @@ func (p *GeminiProvider) GetOverview() (*ai.OverviewResponse, error) {
 // getApiUrl returns the gemini generateContent API url
 func (p *GeminiProvider) getApiUrl() string {
 	return fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=%s", p.APIKey)
+}
+
+// prepareRequestBody prepares the request body for the API
+func (p *GeminiProvider) prepareRequestBody(userInstruction string) *RequestBody {
+	body := &RequestBody{}
+
+	// prepare contents
+	body.Contents.Role = "user"
+	body.Contents.Parts.Text = userInstruction
+
+	// prepare tools
+	toolCalls := make([]*FunctionDeclaration, 0)
+	fns.Range(func(_, value interface{}) bool {
+		fn := value.(*connectedFn)
+		toolCalls = append(toolCalls, fn.fd)
+		return true
+	})
+	body.Tools = make([]Tool, 0)
+	if len(toolCalls) > 0 {
+		body.Tools = append(body.Tools, Tool{
+			FunctionDeclarations: toolCalls,
+		})
+	}
+
+	return body
 }
 
 // NewGeminiProvider creates a new GeminiProvider
