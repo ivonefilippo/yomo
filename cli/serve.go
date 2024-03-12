@@ -28,7 +28,7 @@ import (
 
 	"github.com/yomorun/yomo/pkg/bridge/ai"
 	"github.com/yomorun/yomo/pkg/bridge/ai/provider/azopenai"
-	cloudflareAzureGateway "github.com/yomorun/yomo/pkg/bridge/ai/provider/cloudflare-ai-gateway-azure"
+	"github.com/yomorun/yomo/pkg/bridge/ai/provider/cfazure"
 	"github.com/yomorun/yomo/pkg/bridge/ai/provider/gemini"
 	"github.com/yomorun/yomo/pkg/bridge/ai/provider/openai"
 )
@@ -129,7 +129,7 @@ func registerAIProvider(aiConfig *ai.Config) error {
 		case "openai":
 			ai.RegisterProvider(openai.NewProvider(provider["api_key"], provider["model"]))
 		case "cloudflare_azure":
-			ai.RegisterProvider(cloudflareAzureGateway.NewProvider(
+			ai.RegisterProvider(cfazure.NewProvider(
 				provider["endpoint"],
 				provider["api_key"],
 				provider["resource"],

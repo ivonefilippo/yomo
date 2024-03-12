@@ -1,5 +1,5 @@
-// Package azopenai is used to provide the Azure OpenAI service
-package cloudflareAzureGateway
+// Package cfazure is used to provide the Azure OpenAI service
+package cfazure
 
 import (
 	"bytes"
@@ -107,10 +107,7 @@ func (p *CloudflareAzureProvider) GetChatCompletions(userInstruction string, md 
 	}
 	ylog.Debug("response", "body", respBody)
 
-	// slog.Info("response body", "body", string(respBody))
 	if resp.StatusCode >= 400 {
-		// log.Println(resp.StatusCode, string(respBody))
-		// {"error":{"code":"429","message": "Requests to the ChatCompletions_Create Operation under Azure OpenAI API version 2023-12-01-preview have exceeded token rate limit of your current OpenAI S0 pricing tier. Please retry after 22 seconds. Please go here: https://aka.ms/oai/quotaincrease if you would like to further increase the default rate limit."}}
 		return nil, fmt.Errorf("ai response status code is %d", resp.StatusCode)
 	}
 
@@ -119,10 +116,6 @@ func (p *CloudflareAzureProvider) GetChatCompletions(userInstruction string, md 
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println(string(respBody))
-	// TODO: record usage
-	// usage := respBodyStruct.Usage
-	// log.Printf("Token Usage: %+v\n", usage)
 
 	choice := respBodyStruct.Choices[0]
 	ylog.Debug(">>finish_reason", "reason", choice.FinishReason)
@@ -147,8 +140,6 @@ func (p *CloudflareAzureProvider) GetChatCompletions(userInstruction string, md 
 					result.ToolCalls = make(map[uint32][]*ai.ToolCall)
 				}
 
-				// push the `call` instead of `call.Function` as describes in
-				// https://cookbook.openai.com/examples/function_calling_with_an_openapi_spec
 				currentCall := call
 				result.ToolCalls[tag] = append(result.ToolCalls[tag], &currentCall)
 			}
